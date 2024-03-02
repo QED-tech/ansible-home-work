@@ -1,0 +1,64 @@
+- name:
+  hosts: all
+  tasks:
+    - name: Create user ansible-worker
+      ansible.builtin.user:
+        name: ansible-worker
+        state: present
+        groups: sudo
+        generate_ssh_key: true
+
+    - name: Install git
+      ansible.builtin.package:
+        name: git
+        state: present
+
+    - name: Copy private ssh key
+      ansible.builtin.copy:
+        src: "ssh_keys/id_rsa"
+        dest: "/home/ansible-worker/.ssh/id_rsa"
+        owner: ansible-worker
+        mode: '0600'
+
+    - name: Copy public ssh key
+      ansible.builtin.copy:
+        src: "ssh_keys/id_rsa.pub"
+        dest: "/home/ansible-worker/.ssh/id_rsa.pub"
+        owner: ansible-worker
+        mode: '0644'
+
+    - name: Clone repo
+      become_user: ansible-worker
+      become: yes
+      ansible.builtin.git:
+        repo: git@github.com:iphilka/stud-template.git
+        dest: /home/ansible-worker/www/
+        accept_hostkey: yes
+        force: true
+
+    - name: Copy index.html
+      ansible.builtin.copy:
+        src: "templates/index.html"
+        dest: /home/ansible-worker/www/stud-template/
+        owner: ansible-worker
+        mode: '0666'
+
+    - name: Install nginx
+      ansible.builtin.package:
+        name: nginx
+        state: present
+
+    - name: Added www-data to sudo users
+      ansible.builtin.shell: gpasswd -a www-data sudo
+
+    - name: Copy nginx config
+      ansible.builtin.copy:
+        src: "nginx/ansible.iphilka.ru.conf"
+        dest: /etc/nginx/sites-available
+
+    - name: Create symlink for sites-enabled
+      ignore_errors: yes
+      ansible.builtin.shell: ln -s /etc/nginx/sites-available/ansible.iphilka.ru.conf /etc/nginx/sites-enabled/ansible.iphilka.ru.conf
+
+    - name: Nginx restart
+      ansible.builtin.shell: systemctl restart nginx

@@ -1,0 +1,1 @@
+ansible-playbook -i hosts.ini playbook.yml -e "ansible_host=ansible.iphilka.ru ansible_user=root"
